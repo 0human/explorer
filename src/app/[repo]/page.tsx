@@ -90,6 +90,16 @@ export default async function RepoDetail({ params }: Props) {
                   <ArrowUpRight size={16} />
                 </Button>
               </Link>
+              <Link href={`${repoDetail.repoUrl}/issues/new`} target="_blank">
+                <Button
+                  variant="default"
+                  className="text-sm gap-1.5 transition-all duration-200"
+                  size="sm"
+                >
+                  创建 Issue
+                  <AlertCircle size={16} />
+                </Button>
+              </Link>
             </CardHeader>
 
             <CardContent className="p-6 space-y-6">

@@ -2,18 +2,7 @@ import { z } from "zod";
 
 import { createTRPCRouter, publicProcedure } from "@/server/api/trpc";
 import { paginationInput } from "@/server/zod-types";
-
-// Mocked DB
-interface Post {
-  id: number;
-  name: string;
-}
-const posts: Post[] = [
-  {
-    id: 1,
-    name: "Hello World",
-  },
-];
+import type { RestEndpointMethodTypes } from "@octokit/plugin-rest-endpoint-methods";
 
 const ORG_NAME = '0human'
 
@@ -37,7 +26,7 @@ export const githubRouter = createTRPCRouter({
           });
           // 解码base64编码的README内容
           readme = Buffer.from(readmeRes.data.content, 'base64').toString('utf-8');
-        } catch (error) {
+        } catch {
           // 如果没有README，忽略错误
         }
 
@@ -59,7 +48,7 @@ export const githubRouter = createTRPCRouter({
           private: res.data.private,
           readme,
         };
-      } catch (error) {
+      } catch {
         return null;
       }
     }),
@@ -67,13 +56,41 @@ export const githubRouter = createTRPCRouter({
   getRepos: publicProcedure
     .input(paginationInput)
     .query(async ({ input, ctx }) => {
+      const ignoredRepos = ['explorer', '.github'];
       const { page, pageSize } = input;
-      const res = await ctx.octokit.rest.repos.listForOrg({
-        org: ORG_NAME,
-        per_page: pageSize,
-        page,
-      });
-      return res.data.map(v => ({
+      
+      // 获取所有仓库（不使用GitHub的分页）
+      let allRepos: RestEndpointMethodTypes["repos"]["listForOrg"]["response"]["data"] = [];
+      let currentPage = 1;
+      let hasMore = true;
+      
+      while (hasMore) {
+        const res = await ctx.octokit.rest.repos.listForOrg({
+          org: ORG_NAME,
+          per_page: 100, // 一次获取最多100个
+          page: currentPage,
+          type: 'public',
+          sort: 'updated',
+          direction: 'desc',
+        });
+        
+        if (res.data.length === 0) {
+          hasMore = false;
+        } else {
+          allRepos = [...allRepos, ...res.data];
+          currentPage++;
+        }
+      }
+      
+      // 过滤掉被忽略的仓库
+      const filteredRepos = allRepos.filter((repo: {name: string}) => !ignoredRepos.includes(repo.name));
+      
+      // 手动分页
+      const startIndex = page * pageSize;
+      const endIndex = startIndex + pageSize;
+      const paginatedRepos = filteredRepos.slice(startIndex, endIndex);
+      
+      return paginatedRepos.map(v => ({
         id: v.id,
         name: v.name,
         description: v.description,
@@ -83,21 +100,6 @@ export const githubRouter = createTRPCRouter({
         openIssuesCount: v.open_issues_count,
         watchers: v.watchers,
         stargazersCount: v.stargazers_count,
-      }))
+      }));
     }),
-
-  create: publicProcedure
-    .input(z.object({ name: z.string().min(1) }))
-    .mutation(async ({ input }) => {
-      const post: Post = {
-        id: posts.length + 1,
-        name: input.name,
-      };
-      posts.push(post);
-      return post;
-    }),
-
-  getLatest: publicProcedure.query(() => {
-    return posts.at(-1) ?? null;
-  }),
 });
