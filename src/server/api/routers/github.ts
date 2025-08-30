@@ -7,7 +7,8 @@ import type { RestEndpointMethodTypes } from "@octokit/plugin-rest-endpoint-meth
 const ORG_NAME = '0human'
 
 export const githubRouter = createTRPCRouter({
-  getRepoDetail: publicProcedure
+  // 获取仓库基本信息
+  getRepoBasicInfo: publicProcedure
     .input(z.object({ repo: z.string() }))
     .query(async ({ input, ctx }) => {
       const { repo } = input;
@@ -16,19 +17,6 @@ export const githubRouter = createTRPCRouter({
           owner: ORG_NAME,
           repo,
         });
-
-        // 获取README内容
-        let readme = null;
-        try {
-          const readmeRes = await ctx.octokit.rest.repos.getReadme({
-            owner: ORG_NAME,
-            repo,
-          });
-          // 解码base64编码的README内容
-          readme = Buffer.from(readmeRes.data.content, 'base64').toString('utf-8');
-        } catch {
-          // 如果没有README，忽略错误
-        }
 
         return {
           id: res.data.id,
@@ -46,10 +34,53 @@ export const githubRouter = createTRPCRouter({
           language: res.data.language,
           license: res.data.license?.name ?? null,
           private: res.data.private,
-          readme,
         };
       } catch {
         return null;
+      }
+    }),
+    
+  // 单独获取README内容
+  getRepoReadme: publicProcedure
+    .input(z.object({ repo: z.string() }))
+    .query(async ({ input, ctx }) => {
+      const { repo } = input;
+      try {
+        const readmeRes = await ctx.octokit.rest.repos.getReadme({
+          owner: ORG_NAME,
+          repo,
+        });
+        // 解码base64编码的README内容
+        return Buffer.from(readmeRes.data.content, 'base64').toString('utf-8');
+      } catch {
+        // 如果没有README或获取失败，返回null
+        return null;
+      }
+    }),
+    
+  // 单独获取tags列表
+  getRepoTags: publicProcedure
+    .input(z.object({ repo: z.string() }).and(paginationInput))
+    .query(async ({ input, ctx }) => {
+      const { repo, page, pageSize } = input;
+      try {
+        console.log('getRepoTags', repo, page, pageSize);
+        const tagsRes = await ctx.octokit.rest.repos.listTags({
+          owner: ORG_NAME,
+          repo,
+          per_page: pageSize,
+          page,
+        });
+        return {
+          tags: tagsRes.data.map(tag => tag.name),
+          hasMore: tagsRes.data.length >= pageSize,
+        };
+      } catch {
+        // 如果获取tags失败，返回空数组
+        return {
+          tags: [],
+          hasMore: false,
+        };
       }
     }),
 

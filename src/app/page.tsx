@@ -4,6 +4,7 @@ import { api, HydrateClient } from "@/trpc/server";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ArrowUpRight, Star, Eye } from "lucide-react";
+import dayjs from "dayjs";
 
 export default async function Home() {
   const res = await api.github.getRepos()
@@ -44,11 +45,11 @@ export default async function Home() {
                   <div className="space-y-2 text-sm text-muted-foreground">
                     <div className="flex items-center gap-1.5">
                       <span className="font-medium text-foreground w-20">创建时间:</span>
-                      <span>{item.createdAt}</span>
+                      <span>{dayjs(item.createdAt).format("YYYY-MM-DD HH:mm:ss")}</span>
                     </div>
                     <div className="flex items-center gap-1.5">
                       <span className="font-medium text-foreground w-20">更新时间:</span>
-                      <span>{item.updatedAt}</span>
+                      <span>{dayjs(item.updatedAt).format("YYYY-MM-DD HH:mm:ss")}</span>
                     </div>
                     <div className="flex items-center gap-1.5">
                       <span className="font-medium text-foreground w-20">问题数:</span>
